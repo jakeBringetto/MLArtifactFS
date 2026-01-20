@@ -1,0 +1,55 @@
+# Binaries
+mlfs
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# Context files
+context/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache and temp files
+/tmp/
+*.log
+.cache/
+
+# Test fixtures and data
+tests/fixtures/downloads/
+tests/fixtures/cache/
+test-data/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Manifests (generated)
+manifest-*.json
+manifest.json
+
+# Environment
+.env
+.env.local
