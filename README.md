@@ -90,6 +90,44 @@ docker run --rm \
 - **Fetch Manager**: Lazy fetches 16 MB chunks from S3 with caching
 - **Cache Manager**: Local disk cache with SHA256 verification
 
+### Architecture Diagram
+
+```mermaid
+graph TB
+    User[User Application] -->|read /mnt/model/file| FUSE[FUSE Filesystem]
+    FUSE -->|file metadata| Manifest[Manifest JSON]
+    FUSE -->|fetch chunk| FetchMgr[Fetch Manager]
+    FetchMgr -->|check cache| Cache[Cache Manager]
+    Cache -->|cache miss| FetchMgr
+    FetchMgr -->|range request| S3[S3 Storage]
+    S3 -->|chunk data| FetchMgr
+    FetchMgr -->|store chunk| Cache
+    FetchMgr -->|return data| FUSE
+    FUSE -->|file contents| User
+```
+
+### Component Flow
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant FUSE as FUSE Layer
+    participant Fetch as Fetch Manager
+    participant Cache as Cache Manager
+    participant S3 as S3 Storage
+
+    App->>FUSE: read("/mnt/model/pytorch_model.bin", offset=100MB)
+    FUSE->>Fetch: Read(sha256, offset=100MB, size=4KB)
+    Fetch->>Cache: Has(sha256, chunk=6)?
+    Cache-->>Fetch: false (cache miss)
+    Fetch->>S3: GetObject(Range: 96MB-112MB)
+    S3-->>Fetch: 16MB chunk data
+    Fetch->>Cache: Write(sha256, chunk=6, data)
+    Fetch->>Fetch: Extract bytes [100MB:100MB+4KB]
+    Fetch-->>FUSE: 4KB of data
+    FUSE-->>App: 4KB of data
+```
+
 
 ## Requirements
 
