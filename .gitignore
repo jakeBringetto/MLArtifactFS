@@ -38,6 +38,7 @@ Thumbs.db
 tests/fixtures/downloads/
 tests/fixtures/cache/
 test-data/
+s3-test-data/
 *.safetensors
 *.bin
 *.pt

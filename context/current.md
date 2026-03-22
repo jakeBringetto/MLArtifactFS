@@ -1,6 +1,6 @@
 # MLArtifactFS — Current State
 
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-03-22
 
 ---
 
@@ -14,9 +14,9 @@ A FUSE-based filesystem for lazy-loading ML models from S3 storage. Enables rapi
 
 ## Current Milestone
 
-**Milestone 4: S3 Client** (Next to implement)
+**Milestone 5: Fetch Manager** (Next to implement)
 
-**Status:** M1 (Scaffolding) ✅, M2 (Manifest Generator) ✅, and M3 (Cache Manager) ✅ are complete.
+**Status:** M1 (Scaffolding) ✅, M2 (Manifest Generator) ✅, M3 (Cache Manager) ✅, and M4 (S3 Client) ✅ are complete.
 
 ---
 
@@ -51,24 +51,32 @@ A FUSE-based filesystem for lazy-loading ML models from S3 storage. Enables rapi
 
 **Key Deliverable:** Production-ready cache manager for POC scale
 
+### M4: S3 Client ✅ (Completed 2026-03-22)
+- S3 range-request client wrapping AWS SDK v2
+- Dual fetch paths: AWS SDK for `s3://`/HTTPS URLs, `net/http` for presigned URLs
+- All S3 URL formats: `s3://`, virtual-hosted HTTPS (with/without region), path-style HTTPS, presigned
+- Retry: 3 retries, exponential backoff 1s/2s/4s ±25% jitter (ADR-006)
+- Permanent errors (403, 404, 416) fail immediately; transient (503, 429, timeouts) retry
+- Core packages:
+  - [pkg/s3/client.go](../pkg/s3/client.go) - `NewClient()`, `GetRange(ctx, url, start, end)`
+- 19 unit tests passing, 3 integration tests (skipped without AWS creds)
+
+**Key Deliverable:** `client.GetRange(ctx, url, start, end)` ready for M5 consumption
+
 ---
 
 ## What's Next
 
-### Immediate: M4 - S3 Client
-**Objective:** Implement S3 range request client with retry logic and error handling.
+### Immediate: M5 - Fetch Manager
+**Objective:** Orchestrate S3 client (M4) and cache (M3) to serve byte ranges with chunk alignment.
 
 **Deliverables:**
-- `pkg/s3/client.go` with:
-  - `NewClient()` - Initialize AWS SDK v2 client
-  - `GetRange(ctx, url, start, end)` - Fetch byte range from S3
-  - Retry logic for transient errors (503, connection reset)
-  - Error handling for 403/404/416
-- Support for presigned URLs
-- Unit and integration tests
+- `pkg/fetch/manager.go` with:
+  - `NewManager(s3Client, cacheManager, chunkSize)` - Initialize
+  - `Read(ctx, url, sha256, offset, size) ([]byte, error)` - Chunk-aligned cache-or-fetch
+  - `Prefetch(ctx, url, sha256, size) error` - Full download + SHA256 verification + MarkVerified
 
 ### Subsequent Milestones:
-- **M5:** Fetch Manager (orchestrate S3 + cache, chunk alignment)
 - **M6:** FUSE Filesystem (read-only virtual FS)
 - **M7:** CLI Mount Command (wire everything together)
 - **M8:** End-to-End Testing
@@ -126,8 +134,8 @@ mlartifactfs/
 ├── pkg/
 │   ├── manifest/       # ✅ Manifest format, generator, hash computation
 │   ├── cache/          # ✅ Cache manager (M3 complete)
-│   ├── s3/             # 🔲 S3 client with range requests (M4 - next)
-│   ├── fetch/          # 🔲 Fetch manager (M5)
+│   ├── s3/             # ✅ S3 client with range requests (M4 complete)
+│   ├── fetch/          # 🔲 Fetch manager (M5 - next)
 │   └── fuse/           # 🔲 FUSE filesystem implementation (M6)
 ├── context/            # Project knowledge base
 │   ├── current.md      # ⬅️ This file
@@ -144,18 +152,17 @@ mlartifactfs/
 
 ## Active Context Bundle
 
-For the current milestone (M4), see:
-- [bundles/M4-s3-client.bundle.md](./bundles/M4-s3-client.bundle.md)
+For the current milestone (M5), see:
+- [bundles/M5-fetch-manager.bundle.md](./bundles/M5-fetch-manager.bundle.md)
 
 ---
 
 ## Open Questions / Known Risks
 
-### For M4:
-- S3 rate limiting strategy - how aggressive should retry backoff be?
-- Presigned URL support - test with both IAM and presigned URLs
-- Connection pooling - use default AWS SDK settings or customize?
-- Timeout values - what's appropriate for 16 MB chunk downloads?
+### For M5:
+- Concurrent FUSE reads hitting the same chunk simultaneously — need per-chunk locking (anticipate ADR-007)
+- Prefetch: sequential chunks or parallel? (Plan: sequential for MVP, parallelize post-M8)
+- Error propagation: if one prefetch chunk fails SHA256, abort or continue?
 
 ### General:
 - FUSE deadlock prevention (M6)
@@ -190,6 +197,7 @@ go build -o mlfs ./cmd/mlfs
 - All tests passing: ✅
   - pkg/manifest: 10/10 tests
   - pkg/cache: 11/11 tests (100% coverage)
+  - pkg/s3: 19/19 unit tests (+ 3 integration tests skipped without AWS creds)
 
 ---
 
@@ -197,9 +205,9 @@ go build -o mlfs ./cmd/mlfs
 
 - **Full design:** [planning/03-design.md](./planning/03-design.md)
 - **Implementation plan:** [planning/04-implementation-plan.md](./planning/04-implementation-plan.md)
-- **Completed milestones:** [milestones/](./milestones/) (M2, M3)
-- **Next milestone bundle:** [bundles/M4-s3-client.bundle.md](./bundles/M4-s3-client.bundle.md)
+- **Completed milestones:** [milestones/](./milestones/) (M2, M3, M4)
+- **Next milestone bundle:** [bundles/M5-fetch-manager.bundle.md](./bundles/M5-fetch-manager.bundle.md)
 
 ---
 
-**Status:** Ready to begin M4 (S3 Client)
+**Status:** Ready to begin M5 (Fetch Manager)
