@@ -14,7 +14,7 @@
 **Working on a specific milestone?**
 → See [Milestone Bundles](#milestone-bundles) below
 
-**Last updated:** 2026-03-22 (M4 complete, M5 next)
+**Last updated:** 2026-04-09 (M5 complete, M6 next)
 
 ---
 
@@ -24,7 +24,7 @@
 → **[current.md](./current.md)** — Single source of truth for project status
 
 ### "I need to implement the next milestone"
-→ **[bundles/M5-fetch-manager.bundle.md](./bundles/M5-fetch-manager.bundle.md)** — Focused context for M5
+→ **[bundles/M6-fuse-filesystem.bundle.md](./bundles/M6-fuse-filesystem.bundle.md)** — Focused context for M6
 
 ### "I need to understand the architecture"
 → **[planning/03-design.md](./planning/03-design.md)** — Component design, data flow, interfaces
@@ -41,6 +41,7 @@
 - [milestones/M2-manifest-generator.md](./milestones/M2-manifest-generator.md) — Manifest generator
 - [milestones/M3-cache-manager.md](./milestones/M3-cache-manager.md) — Cache manager
 - [milestones/M4-s3-client.md](./milestones/M4-s3-client.md) — S3 client
+- [milestones/M5-fetch-manager.md](./milestones/M5-fetch-manager.md) — Fetch manager
 
 ### "I want to see future plans"
 → **[references/future-optimizations.md](./references/future-optimizations.md)** — Content deduplication, compression ideas
@@ -73,12 +74,14 @@ context/
 ├── milestones/                   # Completed milestone docs
 │   ├── M2-manifest-generator.md # M2 completion summary
 │   ├── M3-cache-manager.md      # M3 completion summary
-│   └── M4-s3-client.md          # M4 completion summary
+│   ├── M4-s3-client.md          # M4 completion summary
+│   └── M5-fetch-manager.md      # M5 completion summary
 │
 ├── bundles/                      # Milestone-specific context bundles
 │   ├── M3-cache-manager.bundle.md # M3 spec (completed)
 │   ├── M4-s3-client.bundle.md   # M4 spec (completed)
-│   └── M5-fetch-manager.bundle.md # M5 spec (next milestone)
+│   ├── M5-fetch-manager.bundle.md # M5 spec (completed)
+│   └── M6-fuse-filesystem.bundle.md # M6 spec (next milestone)
 │
 ├── references/                   # Supporting docs, future plans
 │   ├── future-optimizations.md  # Dedup/compression ideas
@@ -102,8 +105,8 @@ Bundles are optimized, minimal context packages for implementing specific milest
 | M2: Manifest Generator | ✅ Complete | [milestones/M2-manifest-generator.md](./milestones/M2-manifest-generator.md) | 5 min |
 | M3: Cache Manager | ✅ Complete | [milestones/M3-cache-manager.md](./milestones/M3-cache-manager.md) | 5 min |
 | M4: S3 Client | ✅ Complete | [milestones/M4-s3-client.md](./milestones/M4-s3-client.md) | 3 min |
-| M5: Fetch Manager | 🔲 Next | [bundles/M5-fetch-manager.bundle.md](./bundles/M5-fetch-manager.bundle.md) | 3 min |
-| M6: FUSE Filesystem | 🔲 Pending | Not yet created | TBD |
+| M5: Fetch Manager | ✅ Complete | [milestones/M5-fetch-manager.md](./milestones/M5-fetch-manager.md) | 3 min |
+| M6: FUSE Filesystem | 🔲 Next | [bundles/M6-fuse-filesystem.bundle.md](./bundles/M6-fuse-filesystem.bundle.md) | 4 min |
 | M7: CLI Mount Command | 🔲 Pending | Not yet created | TBD |
 | M8: End-to-End Testing | 🔲 Pending | Not yet created | TBD |
 | M9: Documentation | 🔲 Pending | Not yet created | TBD |
@@ -161,7 +164,7 @@ This `/context` directory is managed according to **[context-manager.md](./conte
 - Milestone bundles are the primary work artifacts
 
 **Last major reorganization:** 2026-02-16
-**Last milestone update:** 2026-03-22 (M4 complete)
+**Last milestone update:** 2026-04-09 (M5 complete)
 
 ---
 

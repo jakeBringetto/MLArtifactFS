@@ -1,6 +1,6 @@
 # MLArtifactFS — Current State
 
-**Last Updated:** 2026-03-22
+**Last Updated:** 2026-04-09
 
 ---
 
@@ -14,9 +14,9 @@ A FUSE-based filesystem for lazy-loading ML models from S3 storage. Enables rapi
 
 ## Current Milestone
 
-**Milestone 5: Fetch Manager** (Next to implement)
+**Milestone 6: FUSE Filesystem** (Next to implement)
 
-**Status:** M1 (Scaffolding) ✅, M2 (Manifest Generator) ✅, M3 (Cache Manager) ✅, and M4 (S3 Client) ✅ are complete.
+**Status:** M1 (Scaffolding) ✅, M2 (Manifest Generator) ✅, M3 (Cache Manager) ✅, M4 (S3 Client) ✅, and M5 (Fetch Manager) ✅ are complete.
 
 ---
 
@@ -51,6 +51,18 @@ A FUSE-based filesystem for lazy-loading ML models from S3 storage. Enables rapi
 
 **Key Deliverable:** Production-ready cache manager for POC scale
 
+### M5: Fetch Manager ✅ (Completed 2026-04-09)
+- Chunk-aligned S3 fetch bridging S3 client (M4) and cache manager (M3)
+- singleflight request coalescing per chunk (ADR-007) — concurrent FUSE reads issue exactly one S3 request per chunk
+- Per-waiter cancellation via `DoChan` + `select` — cancelled callers unblock without aborting in-flight fetch
+- Cross-chunk reads handled; last-chunk range clamped to `fileSize-1`
+- Core packages:
+  - [pkg/fetch/manager.go](../pkg/fetch/manager.go) - `NewManager()`, `Read(ctx, url, sha256, offset, size, fileSize)`, `Prefetch(...)`
+- 15 unit tests passing (9 Read + 6 Prefetch)
+- Note: `Read` takes `fileSize int64` (added vs. original spec — required for last-chunk clamping)
+
+**Key Deliverable:** `fetchManager.Read()` and `fetchManager.Prefetch()` ready for M6 consumption
+
 ### M4: S3 Client ✅ (Completed 2026-03-22)
 - S3 range-request client wrapping AWS SDK v2
 - Dual fetch paths: AWS SDK for `s3://`/HTTPS URLs, `net/http` for presigned URLs
@@ -67,18 +79,19 @@ A FUSE-based filesystem for lazy-loading ML models from S3 storage. Enables rapi
 
 ## What's Next
 
-### Immediate: M5 - Fetch Manager
-**Objective:** Orchestrate S3 client (M4) and cache (M3) to serve byte ranges with chunk alignment.
+### Immediate: M6 - FUSE Filesystem
+**Objective:** Implement read-only FUSE virtual filesystem using hanwen/go-fuse v2 (`fs` package). Maps manifest file tree to FUSE operations; delegates reads to fetch manager.
 
 **Deliverables:**
-- `pkg/fetch/manager.go` with:
-  - `NewManager(s3Client, cacheManager, chunkSize)` - Initialize
-  - `Read(ctx, url, sha256, offset, size) ([]byte, error)` - Chunk-aligned cache-or-fetch
-  - `Prefetch(ctx, url, sha256, size) error` - Full download + SHA256 verification + MarkVerified
+- `pkg/fuse/fs.go` with:
+  - `NewFS(manifest, fetchManager)` — build in-memory directory tree from manifest
+  - `Mount(mountPoint, fs)` — wire up go-fuse server
+  - FUSE ops: `Lookup`, `Getattr`, `Open`, `Read`, `Readdir`
+  - Write ops return `EROFS`
 
 ### Subsequent Milestones:
-- **M6:** FUSE Filesystem (read-only virtual FS)
 - **M7:** CLI Mount Command (wire everything together)
+- **M8:** End-to-End Testing
 - **M8:** End-to-End Testing
 - **M9:** Documentation
 
@@ -135,7 +148,7 @@ mlartifactfs/
 │   ├── manifest/       # ✅ Manifest format, generator, hash computation
 │   ├── cache/          # ✅ Cache manager (M3 complete)
 │   ├── s3/             # ✅ S3 client with range requests (M4 complete)
-│   ├── fetch/          # 🔲 Fetch manager (M5 - next)
+│   ├── fetch/          # ✅ Fetch manager (M5 complete)
 │   └── fuse/           # 🔲 FUSE filesystem implementation (M6)
 ├── context/            # Project knowledge base
 │   ├── current.md      # ⬅️ This file
@@ -152,17 +165,18 @@ mlartifactfs/
 
 ## Active Context Bundle
 
-For the current milestone (M5), see:
-- [bundles/M5-fetch-manager.bundle.md](./bundles/M5-fetch-manager.bundle.md)
+For the current milestone (M6), see:
+- [bundles/M6-fuse-filesystem.bundle.md](./bundles/M6-fuse-filesystem.bundle.md)
 
 ---
 
 ## Open Questions / Known Risks
 
-### For M5:
-- Concurrent FUSE reads hitting the same chunk simultaneously — need per-chunk locking (anticipate ADR-007)
-- Prefetch: sequential chunks or parallel? (Plan: sequential for MVP, parallelize post-M8)
-- Error propagation: if one prefetch chunk fails SHA256, abort or continue?
+### For M6:
+- FUSE deadlock prevention: don't call back into FUSE from FUSE callbacks; fetchManager.Read only touches disk/S3
+- Testing without /dev/fuse: test node struct methods directly without mounting
+- go-fuse inode caching: set EntryTimeout to max (manifest is immutable)
+- Short read handling: if fetchManager.Read returns fewer bytes than requested (near EOF), go-fuse handles gracefully
 
 ### General:
 - FUSE deadlock prevention (M6)
@@ -198,6 +212,7 @@ go build -o mlfs ./cmd/mlfs
   - pkg/manifest: 10/10 tests
   - pkg/cache: 11/11 tests (100% coverage)
   - pkg/s3: 19/19 unit tests (+ 3 integration tests skipped without AWS creds)
+  - pkg/fetch: 15/15 tests (9 Read + 6 Prefetch)
 
 ---
 
@@ -206,7 +221,7 @@ go build -o mlfs ./cmd/mlfs
 - **Full design:** [planning/03-design.md](./planning/03-design.md)
 - **Implementation plan:** [planning/04-implementation-plan.md](./planning/04-implementation-plan.md)
 - **Completed milestones:** [milestones/](./milestones/) (M2, M3, M4)
-- **Next milestone bundle:** [bundles/M5-fetch-manager.bundle.md](./bundles/M5-fetch-manager.bundle.md)
+- **Next milestone bundle:** [bundles/M6-fuse-filesystem.bundle.md](./bundles/M6-fuse-filesystem.bundle.md)
 
 ---
 
