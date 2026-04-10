@@ -121,6 +121,76 @@ Savings: $4.92/month (85% reduction)
 
 ---
 
+## Fetch Concurrency & Reliability
+
+### 1. Per-Chunk Single-Flight (Request Coalescing)
+
+**Problem:** Multiple concurrent FUSE reads hitting the same uncached chunk each independently issue an S3 fetch, wasting bandwidth and S3 request quota.
+
+**What:** Use `golang.org/x/sync/singleflight` keyed on `(sha256, chunkIndex)`. Only one fetch runs at a time per chunk; all other waiters block on the same in-flight request and receive the result when it completes.
+
+```go
+var group singleflight.Group
+
+func (m *Manager) fetchChunk(ctx context.Context, key string, ...) ([]byte, error) {
+    data, err, _ := group.Do(key, func() (interface{}, error) {
+        return m.s3.GetRange(ctx, url, start, end)
+    })
+    return data.([]byte), err
+}
+```
+
+**Benefit:** Reduces duplicate S3 requests to exactly one per chunk under any concurrency level. Directly addresses the concurrent-read race noted in M5 bundle and ADR-007 scope.
+
+---
+
+### 2. Atomic Cache Writes with fsync
+
+**What:** Current atomic write pattern is temp file → rename. Strengthen to: write chunk to temp file → `fsync` → atomic rename → mark complete.
+
+**Why:** Without `fsync`, a crash between write and rename can leave a partial temp file. Without fsync before rename, the rename can be persisted while the data is still in the OS page cache — a subsequent crash produces a zero-byte or partial chunk file that appears complete.
+
+**Tradeoff:** `fsync` is expensive (~1-10ms per chunk). Acceptable for 16 MB chunks where S3 fetch latency dominates; revisit if chunk size shrinks.
+
+---
+
+### 3. Failure Handling for In-Flight Fetches
+
+**Problem:** If a fetch owner crashes or times out mid-flight, waiters using `singleflight` will receive the error and can retry. But if a partial temp file was left on disk, the next attempt needs to detect and clean it up.
+
+**Components:**
+
+**Timeouts/leases on in-flight entries:**
+- Wrap S3 fetch context with a per-chunk deadline (e.g. 60s)
+- If deadline exceeded, singleflight returns error to all waiters
+- Waiters can independently retry — singleflight key is released on error
+
+**Stale temp file cleanup:**
+- On `Manager` init, scan cache dir for orphaned `.tmp` files and delete them
+- Alternatively, detect on cache miss: if `.tmp` exists but chunk does not, delete and re-fetch
+
+**Waiters don't block forever:**
+- Propagate the caller's `context.Context` through singleflight
+- If caller context is cancelled (e.g. FUSE request timeout), waiter exits immediately
+- Note: `singleflight.Do` does not support per-waiter context cancellation natively — use `DoChan` variant with a select
+
+```go
+ch := group.DoChan(key, fetchFn)
+select {
+case res := <-ch:
+    return res.Val.([]byte), res.Err
+case <-ctx.Done():
+    return nil, ctx.Err()
+}
+```
+
+**Abandoned fetch retry:**
+- If all waiters cancel, the in-flight fetch continues to completion (singleflight behavior)
+- Result is discarded but chunk lands in cache — next read is a cache hit
+- Acceptable for MVP; could add explicit cancellation with `errgroup` if needed
+
+---
+
 ## Related Optimizations
 
 ### 1. S3 Intelligent Tiering

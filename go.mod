@@ -1,8 +1,6 @@
 module github.com/jakeBringetto/MLArtifactFS
 
-go 1.23
-
-toolchain go1.24.12
+go 1.25.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.1 // indirect
@@ -25,4 +23,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6 // indirect
 	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/hanwen/go-fuse/v2 v2.9.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 )
